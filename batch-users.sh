@@ -378,9 +378,11 @@ if ! jq --argjson n "$new_clients" '.inbounds[0].settings.clients += $n' "$CONFI
     exit 1
 fi
 mv "$tmp" "$CONFIG"
+chmod 644 "$CONFIG"
 
 if ! xray run -test -config "$CONFIG" >/dev/null 2>&1; then
     mv "$CONFIG.bak" "$CONFIG"
+    chmod 644 "$CONFIG"
     echo "Ошибка в конфиге, изменения отменены"
     exit 1
 fi
@@ -505,6 +507,7 @@ if ! jq --arg p "$prefix" '.inbounds[0].settings.clients |= map(select(.email | 
     exit 1
 fi
 mv "$tmp" "$CONFIG"
+chmod 644 "$CONFIG"
 systemctl restart xray
 remove_share "$prefix"
 rm -rf "$EXPORT_DIR/$prefix" "$EXPORT_DIR/$prefix.zip"
