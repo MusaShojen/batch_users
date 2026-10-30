@@ -607,19 +607,26 @@ cat << 'EOF' >> "$HELP_FILE"
 EOF
 fi
 
-if [[ -f /etc/nginx/sites-available/default ]] && ! grep -q 'location ~ /\.' /etc/nginx/sites-available/default; then
-    tmp=$(mktemp)
-    awk '
-        /add_header Strict-Transport-Security/ {
-            print
-            print "        autoindex off;"
-            print "        location ^~ /.well-known/ { }"
-            print "        location ~ /\. { deny all; }"
-            next
-        }
-        { print }
-    ' /etc/nginx/sites-available/default > "$tmp" && mv "$tmp" /etc/nginx/sites-available/default
-    systemctl reload nginx 2>/dev/null || systemctl restart nginx 2>/dev/null || true
+# Закрыть скрытые файлы (.group, .hours). Важно: в awk нужен /\\., иначе получится "/." и nginx отдаст 403 на весь сайт.
+if [[ -f /etc/nginx/sites-available/default ]]; then
+    if grep -qE 'location[[:space:]]+~[[:space:]]+/\.[[:space:]]*\{[[:space:]]*deny all' /etc/nginx/sites-available/default; then
+        # уже было сломано установщиком — чиним
+        sed -i -E 's|location[[:space:]]+~[[:space:]]+/\.[[:space:]]*\{[[:space:]]*deny all;[[:space:]]*\}|location ~ /\\. { deny all; }|' /etc/nginx/sites-available/default
+        systemctl reload nginx 2>/dev/null || systemctl restart nginx 2>/dev/null || true
+    elif ! grep -qE 'location[[:space:]]+~[[:space:]]+/\\.' /etc/nginx/sites-available/default; then
+        tmp=$(mktemp)
+        awk '
+            /add_header Strict-Transport-Security/ {
+                print
+                print "        autoindex off;"
+                print "        location ^~ /.well-known/ { }"
+                print "        location ~ /\\. { deny all; }"
+                next
+            }
+            { print }
+        ' /etc/nginx/sites-available/default > "$tmp" && mv "$tmp" /etc/nginx/sites-available/default
+        systemctl reload nginx 2>/dev/null || systemctl restart nginx 2>/dev/null || true
+    fi
 fi
 
 refreshpages >/dev/null 2>&1 || true
